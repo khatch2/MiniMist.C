@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniMiST</title>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script>
+        var isPause;
+        var chartVT, chartIT, chart_temp, chart_hum;
+        var intervalID_solar, intervalID_sensor, intervalID_stream;
+        var count = 0;
+        var time_interval = 1000;
+        var stream_button_state = 0;
+
+        window.onload = function () {
+            isPause = false;
+            chartVT = new Highcharts.Chart({
+                chart: {
+                    renderTo: 'graphVT',
+                    zoomType: 'xy',
+                    panning: {
+                        enabled: true,
+                        type: 'xy'
+                    },
+                    panKey: 'ctrl',
+                    type: 'spline'
+                },
+                title: { text: 'Solar Voltage Graph' },
+                series: [{
+                    name: "Voltage",
+                    showInLegend: false,
+                    data: [],
+                    zones: [
+                        {
+                            value: 0.1,
+                            color: '#434348'
+                        },
+                        {
+                            value: 0.5,
+                            color: '#F45B5B'
+                        },
+                        {
+                            value: 2.5,
+                            color: '#f7a35c'
+                        },
+                        { color: '#90ed7d' }
+                    ]
+                }],
+                xAxis: {
+                    type: 'datetime',
+                    dateTimeLabelFormats: { second: '%H:%M:%S' }
+                },
+                yAxis: {
+                    title: { text: 'Volatage (V)' }
+                },
+                plotOptions: {
+                    line: {
+                        animation: {
+                            duration: 1000,
+                            defer: 2
+                        },
+                        dataLabels: { enabled: true }
+                    },
+                    series: { color: '#308712' }
+                },
+
+                credits: { enabled: false }
+            });
+
+            chartIT = new Highcharts.Chart({
+                chart: {
+                    renderTo: 'graphIT',
+                    zoomType: 'xy',
+                    panning: {
+                        enabled: true,
+                        type: 'xy'
+                    },
+                    panKey: 'ctrl',
+                    type: 'spline'
+                },
+                title: { text: 'Solar Current Graph' },
+                series: [{
+                    name: "Current Time",
+                    showInLegend: false,
+                    data: [],
+                }],
+                xAxis: {
+                    type: 'datetime',
+                    dateTimeLabelFormats: { second: '%H:%M:%S' }
+                },
+                yAxis: {
+                    title: { text: 'Current (I/mA)' },
+                },
+                plotOptions: {
+                    line: {
+                        animation: {
+                            duration: 1000,
+                            defer: 2
+                        },
+                        dataLabels: { enabled: true }
+                    },
+                    series: { color: '#660000' }
+                },
+                credits: { enabled: false }
+            });
+            chartVI = new Highcharts.Chart({
+                chart: {
+                    renderTo: 'graphVI',
+                    zoomType: 'xy',
+                    panning: {
+                        enabled: true,
+                        type: 'xy'
+                    },
+                    panKey: 'ctrl',
+                    type: 'scatter'
+                },
+                title: { text: 'VOltage Current' },
+                series: [{
+                    name: "Volt",
+                    showInLegend: false,
+                    data: [],
+                }],
+                xAxis: {
+                    title: { text: "Voltage" }
+                },
+                yAxis: {
+                    title: { text: 'Current (I/mA)' },
+                },
+                plotOptions: {
+                    line: {
+                        animation: {
+                            duration: 1000,
+                            defer: 2
+                        },
+                        dataLabels: { enabled: true }
+                    },
+                    series: { color: '#660000' }
+                },
+                credits: { enabled: false }
+            });
+
+
+            chart_temp = new Highcharts.Chart({
+                chart: {
+                    renderTo: 'temp',
+                    zoomType: 'xy',
+                    panning: {
+                        enabled: true,
+                        type: 'xy'
+                    },
+                    panKey: 'ctrl',
+                    type: 'spline'
+                },
+                title: { text: 'Temperature' },
+                series: [{
+                    name: "TemperatureC",
+                    showInLegend: false,
+                    data: []
+                }],
+                xAxis: {
+                    type: 'datetime',
+                    dateTimeLabelFormats: { second: '%H:%M:%S' }
+                },
+                yAxis: {
+                    title: { text: 'Temperature (C)' }
+                },
+                plotOptions: {
+                    line: {
+                        animation: {
+                            duration: 1000,
+                            defer: 2
+                        },
+                        dataLabels: { enabled: true }
+                    }
+                },
+                credits: { enabled: false }
+            });
+
+            chart_hum = new Highcharts.Chart({
+                chart: {
+                    renderTo: 'hum',
+                    zoomType: 'xy',
+                    panning: {
+                        enabled: true,
+                        type: 'xy'
+                    },
+                    panKey: 'ctrl',
+                    type: 'spline'
+                },
+                title: { text: 'Humidity' },
+                series: [{
+                    name: "Hum",
+                    showInLegend: false,
+                    data: []
+                }],
+                xAxis: {
+                    type: 'datetime',
+                    dateTimeLabelFormats: { second: '%H:%M:%S' }
+                },
+                yAxis: {
+                    title: { text: 'humidity' }
+                },
+                plotOptions: {
+                    line: {
+                        animation: {
+                            duration: 1000,
+                            defer: 2
+                        },
+                        dataLabels: { enabled: true }
+                    }
+                },
+                credits: { enabled: false }
+            });
+
+            // intervalID_solar = setInterval(updatesolar, time_interval);
+            // intervalID_sensor = setInterval(updatesensor, 1020);
+            setInterval(updatedatetime, 1000);
+        }
+        function updatedatetime() {
+            if (!isPause) {
+                var dt = new Date();
+                document.getElementById("time").innerHTML = dt.toLocaleTimeString();
+                document.getElementById("date").innerHTML = dt.toLocaleDateString();
+            }
+        }
+
+        function check_interval(chart1, now) {
+            return false;
+        }
+
+        function updatesolar(callback1) {
+            var xhttp = new XMLHttpRequest();
+            xhttp.onload = function () {
+                if (this.status == 200) {
+                    var x = (new Date()).getTime();
+                    var temp = JSON.parse(this.responseText);
+                    console.log(temp);
+                    var y = parseFloat(parseFloat(temp["solar_voltage"]).toFixed(2));
+                    var z = parseFloat(parseFloat(temp["solar_current"]).toFixed(3));
+                    // var y = parseFloat((Math.random() * 10).toFixed(2));
+                    // var z = y * 34 + 29;
+                    // if (check_interval(chartVT,x)){chartVT.series.remove(true)};
+                    if (chartVT.series[0].data.length > 15) { //TODO check timeinterval between new and first element of series: if large clear data else 
+                        chartVI.series[0].addPoint([y, z], true, true, true);
+                        chartVT.series[0].addPoint([x, y], true, true, true);
+                        chartIT.series[0].addPoint([x, z], true, true, true);
+                    } else {
+                        chartVI.series[0].addPoint([y, z], true, false, true);
+                        chartVT.series[0].addPoint([x, y], true, false, true);
+                        chartIT.series[0].addPoint([x, z], true, false, true);
+                    }
+                    if (count % 5 == 0) {
+                        document.getElementById("BatteryLevel").innerHTML = (parseFloat(temp["battery_voltage"]).toFixed(0)) + " %";
+                    }
+                    count++;
+                    document.getElementById("Volt").innerHTML = (parseFloat(temp["solar_voltage"]).toFixed(1)) + " V";
+                    document.getElementById("Cur").innerHTML = (parseFloat(temp["solar_current"]).toFixed(2)) + " mA";
+                    document.getElementById("Power").innerHTML = (parseFloat(temp["solar_power"]).toFixed(2)) + " mW";
+                }
+            }
+            xhttp.open("GET", "/getsolar", true);
+            xhttp.send();
+            console.log("solar done");
+            setTimeout(() => {
+                if (typeof (callback1) === 'function') { callback1(); }
+            }, 500);
+        }
+
+        function updatesensor() {
+            xhrtbl = new XMLHttpRequest();
+            xhrtbl.open("GET", "/getsensor", true);
+            xhrtbl.send();
+            xhrtbl.onload = function () {
+                if (this.status == 200) {
+                    var response = JSON.parse(this.responseText);
+                    var x = (new Date()).getTime();
+                    var y = parseFloat(parseFloat(response["temperatureC"]).toFixed(2));
+                    var z = parseFloat(parseFloat(response["humidity"]).toFixed(2));
+                    console.log(response);
+                    if (chart_hum.series[0].data.length > 15) {
+                        chart_hum.series[0].addPoint([x, y], true, true, true);
+                        chart_temp.series[0].addPoint([x, z], true, true, true);
+                    } else {
+                        chart_hum.series[0].addPoint([x, y], true, false, true);
+                        chart_temp.series[0].addPoint([x, z], true, false, true);
+                    }
+                    document.getElementById("temperature").innerHTML = response["temperatureC"] + "°C";
+                    document.getElementById("temperaturef").innerHTML = response["temperatureF"] + "°F";
+                    document.getElementById("humidity").innerHTML = response["humidity"] + "%";
+                }
+            }
+            xhrtbl.onerror = function () {
+                console.log("Error Occured");
+            }
+            console.log("Sensor done");
+        }
+
+        function encode64(inputStr) {
+            var b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+            var outputStr = "data:image.gif;base64,";
+            var i = 0;
+
+            while (i < inputStr.length) {
+                var byte1 = inputStr.charCodeAt(i++) & 0xff;
+                var byte2 = inputStr.charCodeAt(i++) & 0xff;
+                var byte3 = inputStr.charCodeAt(i++) & 0xff;
+
+                var enc1 = byte1 >> 2;
+                var enc2 = ((byte1 & 3) << 4) | (byte2 >> 4);
+
+                var enc3, enc4;
+                if (isNaN(byte2)) {
+                    enc3 = enc4 = 64;
+                } else {
+                    enc3 = ((byte2 & 15) << 2) | (byte3 >> 6);
+                    if (isNaN(byte3)) {
+                        enc4 = 64;
+                    } else {
+                        enc4 = byte3 & 63;
+                    }
+                }
+                outputStr += b64.charAt(enc1) + b64.charAt(enc2) + b64.charAt(enc3) + b64.charAt(enc4);
+            }
+            return outputStr;
+        }
+
+        function loadImage(callback1, callback2) {
+
+            var xhr1 = new XMLHttpRequest();
+            xhr1.open("GET", "/getimage", true);
+            xhr1.overrideMimeType('text/plain; charset=x-user-defined');
+            xhr1.send();
+            xhr1.onload = function () {
+                if (this.status == 200) {
+                    var image = document.getElementById("sat-image");
+                    var response = xhr1.responseText;
+                    source = encode64(response);
+                    image.src = source;
+                }
+            }
+            xhr1.onerror = function () {
+                console.log("Error Occured");
+            }
+            console.log("Image done");
+
+            // setTimeout(() => {
+            //     if (typeof (callback1) === 'function' || typeof (callback2) === 'function') { callback1(callback2); }
+            // }, 500);
+        }
+
+        function stream(stream_button) {
+            stream_button_state = 1 - stream_button_state;
+            var counterint = 0;
+            var counterimg = 0;
+            var countersen = 0;
+            var countersol = 0;
+            enable_stream_button(stream_button, stream_button_state);
+            if (stream_button_state) {
+                intervalID_stream = setInterval(() => {
+                    console.log("Interval start", counterint++);
+                    setTimeout(() => {
+                        let start = (new Date()).getMilliseconds();
+                        loadImage();
+                        let end = (new Date()).getMilliseconds();
+                        console.log("Load image end", counterimg++, "Time : ", end, "-", start, " = ", end - start);
+                        setTimeout(() => {
+                            updatesensor();
+                            console.log("sensor end", countersen++);
+                            setTimeout(() => {
+                                updatesolar();
+                                console.log("Solar end", countersol++);
+                            }, 500);
+                        }, 500);
+                    }, 0);
+                }, 5000);
+            }
+            else {
+                clearInterval(intervalID_stream);
+            }
+        }
+        function enable_stream_button(stream_button, state) {
+            if (state) {
+                stream_button.innerHTML = "Stream: ON";
+                stream_button.style.background = "green";
+                stream_button.style.color = "lightgreen";
+                ["imagebutton", "solarbutton", "sensorbutton"].forEach((button) => {
+                    document.getElementById(button).disabled = true;
+                })
+            }
+            else {
+                stream_button.innerHTML = "Stream: OFF";
+                stream_button.style.background = "lightgrey";
+                stream_button.style.color = "grey";
+                ["imagebutton", "solarbutton", "sensorbutton"].forEach((button) => {
+                    document.getElementById(button).disabled = false;
+                })
+            }
+        }
+
+    </script>
+    <link rel="stylesheet" href="https://unpkg.com/98.css">
+    <style>
+        /* This covers the entire screen where the container is to be placed upon */
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Implement grid in css. Splits the container into grid that can be used to allocate different sections*/
+        .Container {
+            width: 100vw;
+            /* The viewport width (vw) is relative to the width of the browser*/
+            height: 100vh;
+
+            display: grid;
+
+            grid-template-columns: 2fr 0.6fr 1fr;
+            /* 4 columes (image image button table)*/
+            grid-template-rows: 50px 1.5fr 0.8fr 0.2fr 55px;
+            /* 5 Rows (Header graph table datetime footer)*/
+            grid-template-areas:
+                "Header Header Header"
+                "Image Graph Graph"
+                "Image ControlImg Sensor"
+                "Image ControlImg Datetime"
+                "Footer Footer Footer"
+            ;
+
+            padding: 10px;
+            gap: 10px;
+            box-sizing: border-box;
+            background-image: -webkit-linear-gradient(45deg, #ffffff 10%, #3c3a3a81 120%);
+
+            box-shadow: inset 0 0 10px #000000;
+
+            /* The border is size of the window*/
+        }
+
+        .Container .Header,
+        .Footer,
+        .Graph,
+        .ControlImg,
+        .Image,
+        .Datetime,
+        .Sensor {
+            padding: 9px;
+
+            border: 1px solid #000000;
+            -moz-box-shadow: inset 0 0 10px #000000;
+            -webkit-box-shadow: inset 0 0 10px #000000;
+            box-shadow: 0 0 10px #000000;
+            border-radius: 0px 0px 0px 0px;
+            box-sizing: border-box;
+        }
+
+        .Header {
+            grid-column: 1/4;
+            grid-row: 1;
+
+            font-family: 'Times New Roman', Times, serif;
+            font-size: x-large;
+            color: #070741;
+            text-align: center;
+            justify-content: center;
+            align-content: center;
+        }
+
+        .Footer {
+            grid-row: 5;
+            grid-column: 1/4;
+            line-height: 50%;
+            padding: 12px;
+            padding-top: 1.7%;
+            overflow-y: hidden;
+           justify-content:center;
+           align-items:center;
+
+        }
+
+        .Footer::-webkit-scrollbar {
+            display: none;
+            /* for Chrome, Safari, and Opera */
+        }
+
+        /* @keyframes loadimage {} */
+
+        .Image {
+            grid-row: 2/5;
+            grid-column: 1;
+            overflow: auto;
+            display: flex;
+            object-position: center;
+            justify-content: center;
+
+
+        }
+
+        .Image img {
+            transform: rotate(0.25turn);
+            max-width: 100%;
+        }
+
+        .ControlImg {
+            grid-row: 3 / 5;
+            grid-column: 2;
+            padding: 10px;
+        }
+
+        .ControlImg #BatteryLevel {
+            text-align: center;
+        }
+
+        .Graph {
+            grid-row: 2;
+            grid-column: 2/4;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+            scroll-padding: 10px;
+            scroll-behavior: auto;
+            gap: 5px;
+
+        }
+
+        .Graph .graphs {
+            scroll-snap-align: start;
+            scroll-snap-stop: normal;
+        }
+
+        .Sensor {
+            grid-row: 3;
+            grid-column: 3;
+            align-items: center;
+            overflow: auto;
+            padding: 1px;
+            padding-left: 0px;
+        }
+
+        .Datetime {
+            grid-row: 4;
+            grid-column: 3;
+            padding: 7px;
+            border: 2px solid #000000;
+
+        }
+
+        .sensor-data {
+            overflow: auto;
+            position: fixed;
+            top: 0%;
+            height: 60%;
+        }
+
+        .side {
+            display: inline-block;
+            vertical-align: middle;
+            position: relative;
+            float: right;
+            margin-right: 17px;
+        }
+
+        h4 {
+            margin-bottom: 30%;
+            margin-top: 2%;
+
+        }
+
+        button {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+        }
+
+        li.fixed {
+            position: -webkit-sticky;
+            /* position: sticky; */
+            top: 0;
+            list-style-type: none;
+        }
+
+        li {
+            margin-left: 20px;
+            line-height: 15px;
+        }
+
+        @media screen and (max-width: 653px) {
+            body {
+                width: auto !important;
+                overflow-x: hidden !important;
+                overflow-y: scroll;
+                /* has to be scroll, not auto */
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .Container {
+                grid-template-columns: 100%;
+                width: auto;
+                height: max-content;
+                /* 1 colume (image)*/
+                grid-template-rows: 50px 200px 300px 240px 160px 45px 65px;
+                /* 5 Rows (Header graph table datetime footer)*/
+                grid-template-areas:
+                    "Header"
+                    "ControlImg"
+                    "Image"
+                    "Graph"
+                    "Sensor"
+                    "Datetime"
+                    "Footer"
+                ;
+                background-image: -webkit-linear-gradient(45deg, #ffffff 10%, #3c3a3a81 150%);
+
+            }
+
+            *,
+            *:before,
+            *:after {
+                box-sizing: inherit;
+            }
+
+            .Header {
+                grid-column: 1;
+                grid-row: 1;
+
+            }
+
+            @media (max-width: 330px) {
+                .Header {
+                    font-size: large;
+                }
+            }
+
+            .ControlImg {
+                grid-column: 1;
+                grid-row: 2;
+            }
+
+            .Image {
+                grid-column: 1;
+                grid-row: 3;
+            }
+
+            .Graph {
+                grid-column: 1;
+                grid-row: 4;
+            }
+
+            .Sensor {
+                grid-column: 1;
+                grid-row: 5;
+            }
+
+            .Datetime {
+                grid-column: 1;
+                grid-row: 6;
+            }
+
+            .Footer {
+                grid-column: 1;
+                grid-row: 7;
+                padding-top: 18px;
+                overflow-y: auto;
+                box-shadow: 0 0 10px #646161;
+
+
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="Container">
+        <div class="Header ">
+            <b>ESP32 Satellite - MiniMiST</b>
+        </div>
+        <div class="Image">
+            <img id="sat-image" />
+        </div>
+        <div class="ControlImg ">
+            <button class="btn" id="streambutton" onclick="stream(this)">Stream</button><br><br>
+            <button class="btn" id="imagebutton" onclick="loadImage()">Load Image</button>
+            <button class="btn" id="sensorbutton" onclick="updatesensor()">Sensor Data</button>
+            <button class="btn" id="solarbutton" onclick="updatesolar()">Solar Data</button>
+            <!-- <br><br> -->
+            <!-- To add space we use &nbsp -->
+            <!-- <button type="button" onclick="download()">Download Image</button> -->
+            <hr>
+            <p>
+                <center>Battery Remaining</center>
+            <h4>
+                <div id="BatteryLevel">N/A</div>
+            </h4>
+            </p>
+        </div>
+        <div class="Graph tree-view">
+            <div class="graphs" id="graphVT" style=" height: 220px;width: auto;"></div><br>
+            <div class="graphs" id="graphIT" style=" height: 220px;width: auto;"></div><br>
+            <div class="graphs" id="graphVI" style=" height: 220px;width: auto;"></div><br>
+            <div class="graphs" id="temp" style=" height: 220px;width: auto;"></div><br>
+            <div class="graphs" id="hum" style=" height: 220px;width: auto;"></div>
+        </div>
+        <div class="Sensor">
+            <ul id="sensor-data" class="tree-view">
+                <li class="fixed">
+                    <center><u><b>DHT11 Readings</u></b></center><br style="line-height: 10px" />
+                </li>
+                <li>Temperature: <strong>
+                        <div class="side " id="temperature">--</div>
+                    </strong></li>
+                <li>Temperature: <strong>
+                        <div class="side " id="temperaturef">--</div>
+                    </strong> </li>
+                <li>Humidity: <strong>
+                        <div class="side" id="humidity">--</div>
+                    </strong> </li>
+                <li class="fixed">
+                    <br style="line-height: 5px" />
+                    <center><u><b>Solar Readings</b></u></center><br style="line-height: 5px" />
+                </li>
+                <li> Voltage: <strong>
+                        <div class="side " id="Volt">--</div>
+                    </strong></li>
+                <li> Current: <strong>
+                        <div class="side " id="Cur">--</div>
+                    </strong> </li>
+                <li>Power: <strong>
+                        <div class="side" id="Power">--</div>
+                    </strong> </li>
+            </ul>
+        </div>
+
+        <div id="Datetime">
+            <ul class="tree-view">
+                <li><b>Date/Time:</b></li>
+                <li><span id="date">DD/MM/YYYY </span> <span id="time">HH:MM:SS AM/PM</span></li>
+            </ul>
+        </div>
+
+        <div class="Footer">
+            <center><b>Project by: Kocin Sabareeswaran Bama</b></center>
+            <center>
+                <p> Tools used: HTML, CSS, JavaScript, Ajax, Micropython, C, Kicad </p>
+            </center>
+        </div>
+
+    </div>
+</body>
+
+</html>
